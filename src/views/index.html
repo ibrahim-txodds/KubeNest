@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Namespace Manager</title>
+</head>
+<body>
+    <h1>Welcome to the Kubernetes Namespace Manager</h1>
+
+    <!-- Create Namespace -->
+    <h2>Create Namespace</h2>
+    <input type="text" id="createNamespaceName" placeholder="Namespace Name">
+    <button id="createNamespace">Create Namespace</button>
+
+    <!-- Delete Namespace -->
+    <h2>Delete Namespace</h2>
+    <select id="deleteNamespaceDropdown">
+        <option value="">Select a Namespace to Delete</option>
+    </select>
+    <button id="deleteNamespace">Delete Namespace</button>
+
+    <!-- List Namespaces -->
+    <h2>List Namespaces</h2>
+    <select id="namespaceDropdown">
+        <option value="">Select a Namespace</option>
+    </select>
+    <button id="viewResources">View Resources</button>
+    <div id="resourceList"></div>
+
+    <script>
+        // Populate namespaces dropdowns on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/list-namespaces')
+                .then(response => response.json())
+                .then(data => {
+                    const namespaceDropdown = document.getElementById('namespaceDropdown');
+                    const deleteNamespaceDropdown = document.getElementById('deleteNamespaceDropdown');
+                    data.namespaces.forEach(ns => {
+                        const option = new Option(ns, ns);
+                        const deleteOption = option.cloneNode(true);
+                        namespaceDropdown.add(option);
+                        deleteNamespaceDropdown.add(deleteOption);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        // Create namespace
+        document.getElementById('createNamespace').onclick = function() {
+            const name = document.getElementById('createNamespaceName').value;
+            fetch('/create-namespace', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: name })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                window.location.reload(); // Reload to update the namespace list
+            })
+            .catch(error => console.error('Error:', error));
+        };
+
+        // Delete namespace
+        document.getElementById('deleteNamespace').onclick = function() {
+            const name = document.getElementById('deleteNamespaceDropdown').value;
+            fetch(`/delete-namespace/${name}`, { method: 'DELETE' })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                window.location.reload(); // Reload to update the namespace list
+            })
+            .catch(error => console.error('Error:', error));
+        };
+
+        // View resources in selected namespace
+        document.getElementById('viewResources').onclick = function() {
+            const namespace = document.getElementById('namespaceDropdown').value;
+            fetch(`/list-resources/${namespace}`)
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('resourceList');
+                    list.innerHTML = '<ul>' + data.podNames.map(name => '<li>' + name + '</li>').join('') + '</ul>';
+                })
+                .catch(error => console.error('Error:', error));
+        };
+    </script>
+</body>
+</html>

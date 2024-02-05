@@ -34,3 +34,5 @@ class KubernetesNamespaceManager {
         }
     }
 }
+
+module.exports = KubernetesNamespaceManager;
