@@ -7,6 +7,7 @@ const port = 3000;
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+const appsV1Api = kc.makeApiClient(k8s.AppsV1Api);
 
 app.use(express.json());
 
@@ -61,7 +62,9 @@ app.get('/', (req, res) => {
                             .then(response => response.json())
                             .then(data => {
                                 const list = document.getElementById('resourceList');
-                                list.innerHTML = '<ul>' + data.podNames.map(name => '<li>' + name + '</li>').join('') + '</ul>';
+                                // Default to an empty array if data.resources is undefined
+                                const resources = data.resources || [];
+                                list.innerHTML = '<ul>' + resources.map(resource => '<li>' + resource.type + ': ' + resource.name + '</li>').join('') + '</ul>';
                             })
                             .catch(error => console.error('Error:', error));
                     };
@@ -111,13 +114,38 @@ app.get('/list-namespaces', async (req, res) => {
     }
 });
 
-// Route to list pods in a specific namespace
+// Function to list resources of all types within a namespace
+async function listAllResourcesInNamespace(namespace) {
+    try {
+        const resourcePromises = [];
+
+        // Core resources
+        resourcePromises.push(k8sApi.listNamespacedPod(namespace).then(res => res.body.items.map(item => ({ type: 'Pod', name: item.metadata.name }))));
+        resourcePromises.push(k8sApi.listNamespacedService(namespace).then(res => res.body.items.map(item => ({ type: 'Service', name: item.metadata.name }))));
+        resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'ConfigMap', name: item.metadata.name }))));
+
+        // Apps resources
+        resourcePromises.push(appsV1Api.listNamespacedDeployment(namespace).then(res => res.body.items.map(item => ({ type: 'Deployment', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedStatefulSet(namespace).then(res => res.body.items.map(item => ({ type: 'StatefulSet', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'DaemonSet', name: item.metadata.name }))));
+
+        // Wait for all promises to resolve
+        const results = await Promise.all(resourcePromises);
+
+        // Flatten the array of arrays
+        return results.flat();
+    } catch (error) {
+        console.error('Failed to list resources:', error);
+        throw error;
+    }
+}
+
+// Route to list resources of all types within a selected namespace
 app.get('/list-resources/:namespace', async (req, res) => {
     try {
         const namespace = req.params.namespace;
-        const pods = await k8sApi.listNamespacedPod(namespace);
-        const podNames = pods.body.items.map(pod => pod.metadata.name);
-        res.status(200).json({ podNames });
+        const resources = await listAllResourcesInNamespace(namespace);
+        res.status(200).json({ resources });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.toString() });
