@@ -1,7 +1,6 @@
-// frontend/src/App.js
 import React from 'react';
 import './App.css';
-import NamespacesList from './components/NamespacesList';
+import NamespacesList from './components/NamespacesList'; // Corrected path
 
 function App() {
   return (

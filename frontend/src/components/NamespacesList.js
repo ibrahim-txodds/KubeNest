@@ -1,6 +1,6 @@
 // frontend/src/components/NamespacesList.js
 import React, { useEffect, useState } from 'react';
-import { listNamespaces } from '../../services/api';
+import { listNamespaces } from '../services/api';
 
 const NamespacesList = () => {
   const [namespaces, setNamespaces] = useState([]);
