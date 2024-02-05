@@ -128,7 +128,14 @@ async function listAllResourcesInNamespace(namespace) {
         resourcePromises.push(appsV1Api.listNamespacedDeployment(namespace).then(res => res.body.items.map(item => ({ type: 'Deployment', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedStatefulSet(namespace).then(res => res.body.items.map(item => ({ type: 'StatefulSet', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'DaemonSet', name: item.metadata.name }))));
-
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Jobs', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'CronJobs', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Endpoints', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'PsersistenVolumeClaim', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Role', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'RoleBinding', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'NetworkPolicy', name: item.metadata.name }))));
+        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'ResourceQuota', name: item.metadata.name }))));
         // Wait for all promises to resolve
         const results = await Promise.all(resourcePromises);
 
