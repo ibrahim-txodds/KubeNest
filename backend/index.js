@@ -152,7 +152,7 @@ app.get('/list-resources/:namespace', async (req, res) => {
     try {
         const namespace = req.params.namespace;
         const resources = await listAllResourcesInNamespace(namespace);
-        console.log(resources); // Debugging: Log the resources to ensure it's an array
+        //console.log(resources); // Debugging: Log the resources to ensure it's an array
         res.status(200).json({ resources });
     } catch (error) {
         console.error(error);
