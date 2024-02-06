@@ -102,6 +102,30 @@ app.get('/', (req, res) => {
     `);
 });
 
+// Example function to trigger a Jenkins job
+function triggerJenkinsJob(jobName, parameters) {
+    const jenkinsUrl = `http://your-jenkins-server/job/${jobName}/buildWithParameters`;
+    const options = {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`username:${apiToken}`).toString('base64'),
+        'Jenkins-Crumb': 'yourJenkinsCrumb' // If CSRF protection is enabled
+      },
+      body: new URLSearchParams(parameters)
+    };
+  
+    fetch(jenkinsUrl, options)
+      .then(response => {
+        if (response.ok) {
+          console.log('Job triggered successfully');
+        } else {
+          console.error('Failed to trigger job');
+        }
+      })
+      .catch(error => console.error('Error triggering Jenkins job:', error));
+  }
+  
+
 // Route to list namespaces
 app.get('/list-namespaces', async (req, res) => {
     try {
@@ -123,6 +147,9 @@ async function listAllResourcesInNamespace(namespace) {
         resourcePromises.push(k8sApi.listNamespacedPod(namespace).then(res => res.body.items.map(item => ({ type: 'Pod', name: item.metadata.name }))));
         resourcePromises.push(k8sApi.listNamespacedService(namespace).then(res => res.body.items.map(item => ({ type: 'Service', name: item.metadata.name }))));
         resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'ConfigMap', name: item.metadata.name }))));
+        resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'PersistentVolume', name: item.metadata.name }))));
+        resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'PersistentVolumeClaim', name: item.metadata.name }))));
+
 
         // Apps resources
         resourcePromises.push(appsV1Api.listNamespacedDeployment(namespace).then(res => res.body.items.map(item => ({ type: 'Deployment', name: item.metadata.name }))));
@@ -131,11 +158,11 @@ async function listAllResourcesInNamespace(namespace) {
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Jobs', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'CronJobs', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Endpoints', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'PsersistenVolumeClaim', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Role', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'RoleBinding', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'NetworkPolicy', name: item.metadata.name }))));
         resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'ResourceQuota', name: item.metadata.name }))));
+        
         // Wait for all promises to resolve
         const results = await Promise.all(resourcePromises);
 
