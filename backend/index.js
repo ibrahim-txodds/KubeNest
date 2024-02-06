@@ -11,7 +11,6 @@ const appsV1Api = kc.makeApiClient(k8s.AppsV1Api);
 
 app.use(express.json());
 
-// Serve an HTML page with various functionalities
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -38,7 +37,7 @@ app.get('/', (req, res) => {
                 </select>
                 <button id="viewResources">View Resources</button>
                 <div id="resourceList"></div>
-                
+
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         fetch('/list-namespaces')
@@ -54,79 +53,58 @@ app.get('/', (req, res) => {
                                 });
                             })
                             .catch(error => console.error('Error:', error));
-                    });
 
-                    document.getElementById('viewResources').onclick = function() {
-                        const namespace = document.getElementById('namespaceDropdown').value;
-                        fetch(\`/list-resources/\${namespace}\`)
+                        document.getElementById('viewResources').onclick = function() {
+                            const namespace = document.getElementById('namespaceDropdown').value;
+                            fetch(\`/list-resources/\${namespace}\`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    const list = document.getElementById('resourceList');
+                                    list.innerHTML = '<ul>' + data.map(resource => \`
+                                        <li>
+                                            <button onclick="location.href='/view-config?namespace=\${namespace}&type=\${resource.type}&name=\${resource.name}'">
+                                                \${resource.type}: \${resource.name}
+                                            </button>
+                                        </li>
+                                    \`).join('') + '</ul>';
+                                })
+                                .catch(error => console.error('Error:', error));
+                        };
+
+                        document.getElementById('createNamespace').onclick = function() {
+                            const name = document.getElementById('createNamespaceName').value;
+                            fetch('/create-namespace', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ name: name })
+                            })
                             .then(response => response.json())
                             .then(data => {
-                                const list = document.getElementById('resourceList');
-                                // Default to an empty array if data.resources is undefined
-                                const resources = data.resources || [];
-                                list.innerHTML = '<ul>' + resources.map(resource => '<li>' + resource.type + ': ' + resource.name + '</li>').join('') + '</ul>';
+                                alert(data.message);
+                                window.location.reload(); // Reload to update the namespace list
                             })
                             .catch(error => console.error('Error:', error));
-                    };
+                        };
 
-                    document.getElementById('createNamespace').onclick = function() {
-                        const name = document.getElementById('createNamespaceName').value;
-                        fetch('/create-namespace', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ name: name })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            alert(data.message);
-                            window.location.reload(); // Reload to update the namespace list
-                        })
-                        .catch(error => console.error('Error:', error));
-                    };
-
-                    document.getElementById('deleteNamespace').onclick = function() {
-                        const name = document.getElementById('deleteNamespaceDropdown').value;
-                        fetch(\`/delete-namespace/\${name}\`, { method: 'DELETE' })
-                        .then(response => response.json())
-                        .then(data => {
-                            alert(data.message);
-                            window.location.reload(); // Reload to update the namespace list
-                        })
-                        .catch(error => console.error('Error:', error));
-                    };
+                        document.getElementById('deleteNamespace').onclick = function() {
+                            const name = document.getElementById('deleteNamespaceDropdown').value;
+                            fetch(\`/delete-namespace/\${name}\`, { method: 'DELETE' })
+                            .then(response => response.json())
+                            .then(data => {
+                                alert(data.message);
+                                window.location.reload(); // Reload to update the namespace list
+                            })
+                            .catch(error => console.error('Error:', error));
+                        };
+                    });
                 </script>
             </body>
         </html>
     `);
 });
 
-// Example function to trigger a Jenkins job
-function triggerJenkinsJob(jobName, parameters) {
-    const jenkinsUrl = `http://your-jenkins-server/job/${jobName}/buildWithParameters`;
-    const options = {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`username:${apiToken}`).toString('base64'),
-        'Jenkins-Crumb': 'yourJenkinsCrumb' // If CSRF protection is enabled
-      },
-      body: new URLSearchParams(parameters)
-    };
-  
-    fetch(jenkinsUrl, options)
-      .then(response => {
-        if (response.ok) {
-          console.log('Job triggered successfully');
-        } else {
-          console.error('Failed to trigger job');
-        }
-      })
-      .catch(error => console.error('Error triggering Jenkins job:', error));
-  }
-  
-
-// Route to list namespaces
 app.get('/list-namespaces', async (req, res) => {
     try {
         const response = await k8sApi.listNamespace();
@@ -138,35 +116,23 @@ app.get('/list-namespaces', async (req, res) => {
     }
 });
 
-// Function to list resources of all types within a namespace
+// Corrected resource listing with proper API calls for each resource type
 async function listAllResourcesInNamespace(namespace) {
     try {
-        const resourcePromises = [];
+        const resourcePromises = [
+            k8sApi.listNamespacedPod(namespace).then(res => res.body.items.map(item => ({ type: 'Pod', name: item.metadata.name }))),
+            k8sApi.listNamespacedService(namespace).then(res => res.body.items.map(item => ({ type: 'Service', name: item.metadata.name }))),
+            k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'ConfigMap', name: item.metadata.name }))),
+            k8sApi.listNamespacedPersistentVolumeClaim(namespace).then(res => res.body.items.map(item => ({ type: 'PersistentVolumeClaim', name: item.metadata.name }))),
+            appsV1Api.listNamespacedDeployment(namespace).then(res => res.body.items.map(item => ({ type: 'Deployment', name: item.metadata.name }))),
+            appsV1Api.listNamespacedStatefulSet(namespace).then(res => res.body.items.map(item => ({ type: 'StatefulSet', name: item.metadata.name }))),
+            appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'DaemonSet', name: item.metadata.name }))),
+            appsV1Api.listNamespacedReplicaSet(namespace).then(res => res.body.items.map(item => ({ type: 'ReplicaSet', name: item.metadata.name }))),
+            // Add more resource types here as needed
+        ];
 
-        // Core resources
-        resourcePromises.push(k8sApi.listNamespacedPod(namespace).then(res => res.body.items.map(item => ({ type: 'Pod', name: item.metadata.name }))));
-        resourcePromises.push(k8sApi.listNamespacedService(namespace).then(res => res.body.items.map(item => ({ type: 'Service', name: item.metadata.name }))));
-        resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'ConfigMap', name: item.metadata.name }))));
-        resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'PersistentVolume', name: item.metadata.name }))));
-        resourcePromises.push(k8sApi.listNamespacedConfigMap(namespace).then(res => res.body.items.map(item => ({ type: 'PersistentVolumeClaim', name: item.metadata.name }))));
-
-
-        // Apps resources
-        resourcePromises.push(appsV1Api.listNamespacedDeployment(namespace).then(res => res.body.items.map(item => ({ type: 'Deployment', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedStatefulSet(namespace).then(res => res.body.items.map(item => ({ type: 'StatefulSet', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'DaemonSet', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Jobs', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'CronJobs', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Endpoints', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'Role', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'RoleBinding', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'NetworkPolicy', name: item.metadata.name }))));
-        resourcePromises.push(appsV1Api.listNamespacedDaemonSet(namespace).then(res => res.body.items.map(item => ({ type: 'ResourceQuota', name: item.metadata.name }))));
-        
-        // Wait for all promises to resolve
+        // Wait for all promises to resolve and flatten the results
         const results = await Promise.all(resourcePromises);
-
-        // Flatten the array of arrays
         return results.flat();
     } catch (error) {
         console.error('Failed to list resources:', error);
@@ -185,6 +151,33 @@ app.get('/list-resources/:namespace', async (req, res) => {
         res.status(500).json({ error: error.toString() });
     }
 });
+
+app.get('/view-config', async (req, res) => {
+    const { namespace, type, name } = req.query;
+
+    try {
+        let apiResponse;
+        switch (type) {
+            case 'Pod':
+                apiResponse = await k8sApi.readNamespacedPod(name, namespace);
+                break;
+            case 'Service':
+                apiResponse = await k8sApi.readNamespacedService(name, namespace);
+                break;
+            // Include cases for other types, similar to above
+            default:
+                return res.status(400).send('Resource type not supported');
+        }
+
+        // Send the resource details to the client, possibly as JSON
+        // You might want to transform the response or just send a subset of information
+        res.json(apiResponse.body);
+    } catch (error) {
+        console.error(`Error fetching ${type} named ${name} in ${namespace}:`, error);
+        res.status(500).send('Failed to fetch resource configuration');
+    }
+});
+
 
 // Route to create a namespace
 app.post('/create-namespace', async (req, res) => {
