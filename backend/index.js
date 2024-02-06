@@ -37,7 +37,7 @@ app.get('/', (req, res) => {
                 </select>
                 <button id="viewResources">View Resources</button>
                 <div id="resourceList"></div>
-
+                
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         fetch('/list-namespaces')
@@ -59,14 +59,20 @@ app.get('/', (req, res) => {
                             fetch(\`/list-resources/\${namespace}\`)
                                 .then(response => response.json())
                                 .then(data => {
+                                    console.log(data); // Added for debugging
                                     const list = document.getElementById('resourceList');
-                                    list.innerHTML = '<ul>' + data.map(resource => \`
-                                        <li>
-                                            <button onclick="location.href='/view-config?namespace=\${namespace}&type=\${resource.type}&name=\${resource.name}'">
-                                                \${resource.type}: \${resource.name}
-                                            </button>
-                                        </li>
-                                    \`).join('') + '</ul>';
+                                    if (data && Array.isArray(data.resources)) {
+                                        list.innerHTML = '<ul>' + data.resources.map(resource => \`
+                                            <li>
+                                                <button onclick="location.href='/view-config?namespace=\${namespace}&type=\${resource.type}&name=\${resource.name}'">
+                                                    \${resource.type}: \${resource.name}
+                                                </button>
+                                            </li>
+                                        \`).join('') + '</ul>';
+                                    } else {
+                                        console.error('Data is not in the expected format:', data);
+                                        list.innerHTML = '<p>Error loading resources. Please try again.</p>';
+                                    }
                                 })
                                 .catch(error => console.error('Error:', error));
                         };
@@ -104,6 +110,7 @@ app.get('/', (req, res) => {
         </html>
     `);
 });
+
 
 app.get('/list-namespaces', async (req, res) => {
     try {
@@ -145,12 +152,14 @@ app.get('/list-resources/:namespace', async (req, res) => {
     try {
         const namespace = req.params.namespace;
         const resources = await listAllResourcesInNamespace(namespace);
+        console.log(resources); // Debugging: Log the resources to ensure it's an array
         res.status(200).json({ resources });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.toString() });
     }
 });
+
 
 app.get('/view-config', async (req, res) => {
     const { namespace, type, name } = req.query;
